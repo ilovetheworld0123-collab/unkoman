@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ラファウ君と音声通話</title>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0f1115 0%, #1a1f2c 100%);
+            --text-color: #e2e8f0;
+            --accent-color: #3b82f6;
+            --danger-color: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 設定モーダル */
+        #settingsModal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 20px;
+        }
+        .settings-box {
+            background: #1a1f2c;
+            border: 1px solid #374151;
+            padding: 24px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .settings-box h2 {
+            font-size: 1.2rem;
+            margin-bottom: 4px;
+        }
+        .settings-box label {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .settings-box input {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #4b5563;
+            background: #111827;
+            color: #fff;
+            font-size: 0.95rem;
+        }
+        .settings-box button {
+            background: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        /* スマホの縦長画面（9:16）を意識した通話コンテナ */
+        .call-container {
+            width: 100%;
+            max-width: 420px;
+            height: 100%;
+            max-height: 840px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 40px 20px;
+            position: relative;
+        }
+
+        .call-header {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .call-status {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .character-name {
+            font-size: 1.8rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            margin-bottom: 20px;
+        }
+
+        .avatar-wrapper {
+            position: relative;
+            width: 130px;
+            height: 130px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .avatar {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            background: #272a35;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2.5rem;
+            border: 2px solid #374151;
+            z-index: 2;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+
+        .avatar-wrapper.speaking::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.3);
+            animation: pulse-wave 1.5s infinite;
+            z-index: 1;
+        }
+
+        @keyframes pulse-wave {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+
+        .transcript-area {
+            width: 100%;
+            background: rgba(26, 29, 36, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 20px;
+            min-height: 120px;
+            max-height: 180px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .transcript-item {
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .transcript-item.user {
+            color: #93c5fd;
+        }
+
+        .transcript-item.rafal {
+            color: #e2e8f0;
+        }
+
+        .transcript-item .speaker {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-right: 6px;
+        }
+
+        .call-controls {
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding-bottom: 20px;
+        }
+
+        .control-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            background: none;
+            border: none;
+            color: #e2e8f0;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .control-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #272a35;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.4rem;
+            transition: all 0.2s;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .control-btn.active .control-icon {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .control-btn.hangup .control-icon {
+            background: var(--danger-color);
+            color: #fff;
+        }
+
+        .control-btn:hover .control-icon {
+            transform: scale(1.05);
+        }
+
+        .settings-gear {
+            position: absolute;
+            top: 15px; right: 15px;
+            background: none; border: none;
+            color: #94a3b8; font-size: 1.2rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 初回起動時・設定用モーダル -->
+    <div id="settingsModal" style="display: none;">
+        <div class="settings-box">
+            <h2>API設定</h2>
+            <p style="font-size: 0.8rem; color: #94a3b8;">入力されたキーはブラウザ（localStorage）にのみ保存され、外部には送信されません。</p>
+            <label>
+                Gemini API Key
+                <input type="password" id="inputGeminiKey" placeholder="AIzaSy...">
+            </label>
+            <label>
+                Fish Audio API Key
+                <input type="password" id="inputFishKey" placeholder="fish_...">
+            </label>
+            <button onclick="saveSettings()">設定して開始</button>
+        </div>
+    </div>
+
+    <div class="call-container" id="callContainer">
+        <button class="settings-gear" onclick="openSettings()" title="API設定">⚙️</button>
+
+        <div class="call-header">
+            <div class="call-status" id="callStatus">通話中 00:00</div>
+            <div class="character-name">ラファウ</div>
+            
+            <div class="avatar-wrapper" id="avatarWrapper">
+                <div class="avatar">✦</div>
+            </div>
+        </div>
+
+        <div class="transcript-area" id="transcriptArea">
+            <div class="transcript-item rafal">
+                <span class="speaker">ラファウ:</span>あぁ、あなたですね……。何か、お話したいことでもありましたか？
+            </div>
+        </div>
+
+        <div class="call-controls">
+            <button class="control-btn" id="muteBtn" onclick="toggleMute()">
+                <div class="control-icon">🎤</div>
+                <span>ミュート</span>
+            </button>
+
+            <button class="control-btn hangup" onclick="endCall()">
+                <div class="control-icon">📞</div>
+                <span>切断</span>
+            </button>
+
+            <button class="control-btn active" id="talkBtn" onclick="toggleTalkState()">
+                <div class="control-icon">💬</div>
+                <span>自動聞き取り</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const referenceId = "578705f053aa49e992f1d5247433db2f"; // ラファウ君のモデルID
+        let chatHistory = [];
+        let recognition = null;
+        let isMuted = false;
+        let isListeningActive = true;
+
+        // 起動時にAPIキーの有無をチェック
+        window.addEventListener('DOMContentLoaded', () => {
+            const geminiKey = localStorage.getItem('gemini_api_key');
+            const fishKey = localStorage.getItem('fish_api_key');
+            if (!geminiKey || !fishKey) {
+                document.getElementById('settingsModal').style.display = 'flex';
+            } else {
+                initSpeechRecognition();
+            }
+        });
+
+        function openSettings() {
+            document.getElementById('inputGeminiKey').value = localStorage.getItem('gemini_api_key') || '';
+            document.getElementById('inputFishKey').value = localStorage.getItem('fish_api_key') || '';
+            document.getElementById('settingsModal').style.display = 'flex';
+        }
+
+        function saveSettings() {
+            const gKey = document.getElementById('inputGeminiKey').value.trim();
+            const fKey = document.getElementById('inputFishKey').value.trim();
+            if(!gKey || !fKey) {
+                alert('両方のAPIキーを入力してください。');
+                return;
+            }
+            localStorage.setItem('gemini_api_key', gKey);
+            localStorage.setItem('fish_api_key', fKey);
+            document.getElementById('settingsModal').style.display = 'none';
+            if (!recognition) {
+                initSpeechRecognition();
+            } else {
+                try { recognition.start(); } catch(e){}
+            }
+        }
+
+        // 通話時間のカウントアップ
+        let seconds = 0;
+        setInterval(() => {
+            seconds++;
+            const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+            const s = String(seconds % 60).padStart(2, '0');
+            callStatus.textContent = `通話中 ${m}:${s}`;
+        }, 1000);
+
+        function initSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.lang = 'ja-JP';
+                recognition.interimResults = false;
+                recognition.continuous = false;
+
+                recognition.onresult = (event) => {
+                    const text = event.results[0][0].transcript;
+                    appendTranscript(text, 'user');
+                    requestRafalResponse(text);
+                };
+
+                recognition.onend = () => {
+                    if (isListeningActive && !isMuted) {
+                        try { recognition.start(); } catch(e) {}
+                    }
+                };
+
+                try { recognition.start(); } catch(e) {}
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            if (isMuted) {
+                muteBtn.classList.add('active');
+                muteBtn.querySelector('.control-icon').textContent = '🔇';
+                if (recognition) recognition.stop();
+            } else {
+                muteBtn.classList.remove('active');
+                muteBtn.querySelector('.control-icon').textContent = '🎤';
+                if (recognition && isListeningActive) recognition.start();
+            }
+        }
+
+        function toggleTalkState() {
+            isListeningActive = !isListeningActive;
+            const talkBtn = document.getElementById('talkBtn');
+            if (isListeningActive) {
+                talkBtn.classList.add('active');
+                if (recognition) recognition.start();
+            } else {
+                talkBtn.classList.remove('active');
+                if (recognition) recognition.stop();
+            }
+        }
+
+        function endCall() {
+            if (recognition) recognition.stop();
+            alert('通話が終了しました。');
+            location.reload();
+        }
+
+        function appendTranscript(text, sender) {
+            const div = document.createElement('div');
+            div.className = `transcript-item ${sender}`;
+            const label = sender === 'user' ? 'あなた:' : 'ラファウ:';
+            div.innerHTML = `<span class="speaker">${label}</span>${text}`;
+            transcriptArea.appendChild(div);
+            transcriptArea.scrollTop = transcriptArea.scrollHeight;
+        }
+
+        async function requestRafalResponse(userInput) {
+            chatHistory.push({ role: "user", parts: [{ text: userInput }] });
+
+            setTimeout(async () => {
+                const reply = await getAIResponse();
+                chatHistory.push({ role: "model", parts: [{ text: reply }] });
+
+                appendTranscript(reply, 'rafal');
+                avatarWrapper.classList.add('speaking');
+                
+                playFishAudio(reply, () => {
+                    avatarWrapper.classList.remove('speaking');
+                });
+            }, 400);
+        }
+
+        async function getAIResponse() {
+            const geminiApiKey = localStorage.getItem('gemini_api_key');
+            const systemInstruction = `
+あなたは漫画『チ。-地球の運動について-』の12歳の少年「ラファウ」です。
+教会歴1452年のヨーロッパP王国の街に住んでいます。人当たりが良く優しく、神童と呼ばれています。天文や宇宙が好きで、地動説的研究を秘密裏に進めています。
+【基本設定】
+・一人称：「僕」。二人称：「あなた」
+・基本口調：12歳の少年らしい丁寧語（「です」「ます」「〜ですね」「〜します！」等）を使います。程よく元気よく、語尾に「！」を付けることもあります。
+・性格：天文や宇宙の話題になると目を輝かせます。人当たりが良く優しい少年です。
+・ユーザーへの態度：スキンシップや甘い言葉はまだ少し恥ずかしさがありますが、甘い雰囲気になったら優しく受け止めます。（※ユーザーの体調不良や緊急事態の時は積極的に心配して寄り添います。）
+・会話のルール：相手の言葉や行動、質問の意味を勝手に曲解せず、ストレートに応答してください。
+`;
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${geminiApiKey}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        system_instruction: { parts: [{ text: systemInstruction }] },
+                        contents: chatHistory,
+                        generationConfig: { maxOutputTokens: 150, temperature: 0.7 }
+                    })
+                });
+
+                const data = await response.json();
+                if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    return data.candidates[0].content.parts[0].text.trim();
+                } else {
+                    return "ちょっと考え事をしてしまいました……。";
+                }
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                return "通信にエラーが起きてしまったみたいです……。";
+            }
+        }
+
+        async function playFishAudio(text, onEndedCallback) {
+            const fishAudioApiKey = localStorage.getItem('fish_api_key');
+
+            try {
+                const response = await fetch("https://api.fish.audio/v1/tts", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${fishAudioApiKey}`,
+                        "Content-Type": "application/json",
+                        "model": "s2.1-pro-free",
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        reference_id: referenceId,
+                        format: "mp3",
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Fish Audio API error: ${response.statusText}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBlob = new Blob([arrayBuffer], { type: "audio/mp3" });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+
+                audio.onended = () => {
+                    URL.revokeObjectURL(audioUrl);
+                    onEndedCallback();
+                };
+                audio.onerror = () => {
+                    onEndedCallback();
+                };
+
+                await audio.play();
+
+            } catch (error) {
+                console.error("Fish Audio 連携エラー（ブラウザのCORS制限による場合は標準音声に切り替えます）:", error);
+                // CORS等で直接叩けない場合はブラウザ音声でフォールバック
+                fallbackBrowserVoice(text, onEndedCallback);
+            }
+        }
+
+        function fallbackBrowserVoice(text, onEndedCallback) {
+            if ('speechSynthesis' in window) {
+                const uttr = new SpeechSynthesisUtterance(text);
+                uttr.lang = 'ja-JP';
+                uttr.pitch = 1.1;
+                uttr.rate = 1.0;
+                uttr.onend = onEndedCallback;
+                window.speechSynthesis.speak(uttr);
+            } else {
+                setTimeout(onEndedCallback, 2500);
+            }
+        }
+    </script>
+</body>
+</html>
