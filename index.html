@@ -473,21 +473,21 @@
             const fishAudioApiKey = localStorage.getItem('fish_api_key');
 
             try {
-                const params = new URLSearchParams({
-                    text: text,
-                    reference_id: referenceId,
-                    format: "mp3",
-                    model: "s2.1-pro-free"
-                });
-
-                const targetUrl = `https://api.fish.audio/v1/tts?${params.toString()}`;
-                const proxyUrl = "https://corsproxy.io/?";
+                const targetUrl = "https://api.fish.audio/v1/tts";
+                const proxyUrl = "https://api.allorigins.win/raw?url=";
 
                 const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
-                    method: "GET",
+                    method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${fishAudioApiKey}`
-                    }
+                        "Authorization": `Bearer ${fishAudioApiKey}`,
+                        "Content-Type": "application/json",
+                        "model": "s2.1-pro-free",
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        reference_id: referenceId,
+                        format: "mp3",
+                    })
                 });
 
                 if (!response.ok) {
