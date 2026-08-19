@@ -469,11 +469,10 @@
             }
         }
 
-       async function playFishAudio(text, onEndedCallback) {
+        async function playFishAudio(text, onEndedCallback) {
             const fishAudioApiKey = localStorage.getItem('fish_api_key');
 
             try {
-                // CORS制限を回避するためのプロキシを経由してFish Audioを叩く
                 const targetUrl = "https://api.fish.audio/v1/tts";
                 const proxyUrl = "https://corsproxy.io/?";
 
@@ -514,7 +513,6 @@
 
             } catch (error) {
                 console.error("Fish Audio 連携エラー:", error);
-                // エラー時はフォールバックとしてブラウザ標準音声を使う
                 fallbackBrowserVoice(text, onEndedCallback);
             }
         }
