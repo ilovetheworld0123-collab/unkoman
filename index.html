@@ -469,11 +469,15 @@
             }
         }
 
-        async function playFishAudio(text, onEndedCallback) {
+       async function playFishAudio(text, onEndedCallback) {
             const fishAudioApiKey = localStorage.getItem('fish_api_key');
 
             try {
-                const response = await fetch("https://api.fish.audio/v1/tts", {
+                // CORS制限を回避するためのプロキシを経由してFish Audioを叩く
+                const targetUrl = "https://api.fish.audio/v1/tts";
+                const proxyUrl = "https://corsproxy.io/?";
+
+                const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${fishAudioApiKey}`,
@@ -488,7 +492,8 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Fish Audio API error: ${response.statusText}`);
+                    const errDetail = await response.text();
+                    throw new Error(`Fish Audio API error (${response.status}): ${errDetail}`);
                 }
 
                 const arrayBuffer = await response.arrayBuffer();
@@ -500,15 +505,16 @@
                     URL.revokeObjectURL(audioUrl);
                     onEndedCallback();
                 };
-                audio.onerror = () => {
+                audio.onerror = (e) => {
+                    console.error("Audio playback error:", e);
                     onEndedCallback();
                 };
 
                 await audio.play();
 
             } catch (error) {
-                console.error("Fish Audio 連携エラー（ブラウザのCORS制限による場合は標準音声に切り替えます）:", error);
-                // CORS等で直接叩けない場合はブラウザ音声でフォールバック
+                console.error("Fish Audio 連携エラー:", error);
+                // エラー時はフォールバックとしてブラウザ標準音声を使う
                 fallbackBrowserVoice(text, onEndedCallback);
             }
         }
